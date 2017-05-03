@@ -3,11 +3,17 @@ name = "ascii-raycaster"
 version = "0.1.0"
 dependencies = [
  "termion 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vecmath 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
 name = "libc"
 version = "0.2.22"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "piston-float"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
@@ -18,6 +24,16 @@ dependencies = [
  "libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
+[[package]]
+name = "vecmath"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+dependencies = [
+ "piston-float 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
 [metadata]
 "checksum libc 0.2.22 (registry+https://github.com/rust-lang/crates.io-index)" = "babb8281da88cba992fa1f4ddec7d63ed96280a1a53ec9b919fd37b53d71e502"
+"checksum piston-float 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "b058c3a640efd4bcf63266512e4bb03187192c1b29edd38b16d5a014613e3199"
 "checksum termion 1.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "8b41865823fb8c7873ff869893219b3188e7fcd66c10effb97f2b2f63ea98681"
+"checksum vecmath 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "bebe25d9d469c3bc85dd86564c7318a0290e31d472d9fcbca682c93e2925ff00"

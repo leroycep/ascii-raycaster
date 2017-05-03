@@ -5,3 +5,4 @@ authors = ["LeRoyce Pearson <minergeemili@gmail.com>"]
 
 [dependencies]
 termion = "*"
+vecmath = "0.3"

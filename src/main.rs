@@ -1,5 +1,6 @@
 
 extern crate termion;
+extern crate vecmath as vm;
 
 use termion::screen::AlternateScreen;
 use termion::event::Key;
@@ -43,17 +44,16 @@ fn main() {
     let mut stderr = stderr();
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
-    let mut pos = [22.0, 12.0];
-    let mut dir = [-1.0, 0.0];
-    let mut plane = [0.0, 0.66];
+    let mut pos = [22.0, 0.0, 22.0];
+    let mut dir = [1.0, 0.0, 0.0];
 
     let mut time = 0;
     let mut old_time = 0;
 
     let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
     let mut draw_buffer = String::new();
+    let mut moved = true;
     'MAIN: loop {
-        let mut moved = false;
         loop {
             let next = stdin.next();
             if !next.is_some() {
@@ -85,17 +85,11 @@ fn main() {
                     moved = true;
                 }
                 Ok(Key::Char('l')) => {
-                    dir = [dir[0] * (-TURN_SPEED).cos() - dir[1] * (-TURN_SPEED).sin(),
-                           dir[0] * (-TURN_SPEED).sin() + dir[1] * (-TURN_SPEED).cos()];
-                    plane = [plane[0] * (-TURN_SPEED).cos() - plane[1] * (-TURN_SPEED).sin(),
-                             plane[0] * (-TURN_SPEED).sin() + plane[1] * (-TURN_SPEED).cos()];
+                    dir = rotate_y(&dir, -TURN_SPEED);
                     moved = true;
                 }
                 Ok(Key::Char('j')) => {
-                    dir = [dir[0] * (TURN_SPEED).cos() - dir[1] * (TURN_SPEED).sin(),
-                           dir[0] * (TURN_SPEED).sin() + dir[1] * (TURN_SPEED).cos()];
-                    plane = [plane[0] * (TURN_SPEED).cos() - plane[1] * (TURN_SPEED).sin(),
-                             plane[0] * (TURN_SPEED).sin() + plane[1] * (TURN_SPEED).cos()];
+                    dir = rotate_y(&dir, TURN_SPEED);
                     moved = true;
                 }
 
@@ -103,7 +97,7 @@ fn main() {
             }
         }
         if moved {
-            draw(pos, dir, plane, &mut grid);
+            draw(pos, dir, &mut grid);
             draw_buffer.clear();
             use std::fmt::Write;
             for row in grid.iter() {
@@ -117,82 +111,104 @@ fn main() {
                    //termion::clear::All,
                    termion::cursor::Goto(1, 1), draw_buffer);
             screen.flush();
+            moved = false;
         }
         thread::sleep(time::Duration::from_millis(20));
     }
 }
 
-fn draw(pos: [f64; 2], dir: [f64; 2], plane: [f64; 2], grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
-    for x in 0..DISPLAY_SIZE[0] {
-        let camera_x = 2.0 * x as f64 / DISPLAY_SIZE[0] as f64 - 1.0;
-        let ray_pos = pos;
-        let ray_dir = [dir[0] + plane[0] * camera_x, dir[1] + plane[1] * camera_x];
+fn draw(pos: [f64; 3], dir: [f64; 3], grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
+    let mut stderr = stderr();
+    for y in 0..DISPLAY_SIZE[1] as usize {
+        for x in 0..DISPLAY_SIZE[0] as usize {
+            let right = rotate_y(&dir, (-90.0f64).to_radians());
+            let up = vm::vec3_cross(dir, right);
 
-        let mut map_pos = [ray_pos[0] as isize, ray_pos[1] as isize];
-        let delta_dist = [(1.0 + (ray_dir[1] * ray_dir[1]) / (ray_dir[0] * ray_dir[0])).sqrt(),
-                          (1.0 + (ray_dir[0] * ray_dir[0]) / (ray_dir[1] * ray_dir[1])).sqrt()];
+            let u = (x as f64 * 2.0 / DISPLAY_SIZE[0] as f64) - 1.0;
+            let v = (y as f64 * 2.0 / DISPLAY_SIZE[1] as f64) - 1.0;
+            let f = 1.97;
 
-
-        let mut step: [isize; 2] = [0, 0];
-        let mut side_dist: [f64; 2] = [0.0, 0.0];
-        if ray_dir[0] < 0.0 {
-            step[0] = -1;
-            side_dist[0] = (ray_pos[0] - map_pos[0] as f64) * delta_dist[0];
-        } else {
-            step[0] = 1;
-            side_dist[0] = (map_pos[0] as f64 + 1.0 - ray_pos[0]) * delta_dist[0];
-        }
-        if ray_dir[1] < 0.0 {
-            step[1] = -1;
-            side_dist[1] = (ray_pos[1] - map_pos[1] as f64) * delta_dist[1];
-        } else {
-            step[1] = 1;
-            side_dist[1] = (map_pos[1] as f64 + 1.0 - ray_pos[1]) * delta_dist[1];
-        }
-        let mut hit = 0;
-        let mut side = 0;
-
-        while hit == 0 {
-            if side_dist[0] < side_dist[1] {
-                side_dist[0] += delta_dist[0];
-                map_pos[0] += step[0];
-                side = 0;
-            } else {
-                side_dist[1] += delta_dist[1];
-                map_pos[1] += step[1];
-                side = 1;
-            }
-            if WORLD_MAP[map_pos[0] as usize][map_pos[1] as usize] > 0 {
-                hit = 1;
-            }
-        }
-
-        let perp_wall_dist = if side == 0 {
-            (map_pos[0] as f64 - ray_pos[0] + (1.0 - step[0] as f64) / 2.0) / ray_dir[0]
-        } else {
-            (map_pos[1] as f64 - ray_pos[1] + (1.0 - step[1] as f64) / 2.0) / ray_dir[1]
-        };
-        let perp_wall_dist = if perp_wall_dist as isize > 0 { perp_wall_dist } else { 1.0 };
-
-        let line_height = DISPLAY_SIZE[1] / perp_wall_dist as isize;
-        let draw_start = DISPLAY_SIZE[1] / 2 - line_height / 2;
-        let draw_end = line_height / 2 + DISPLAY_SIZE[1] / 2;
-
-        let (character, color) = match WORLD_MAP[map_pos[0] as usize][map_pos[1] as usize] {
-            1 => ('r', termion::color::Rgb(255, 10, 10)),
-            2 => ('g', termion::color::Rgb( 10,255, 10)),
-            3 => ('b', termion::color::Rgb( 10, 10,255)),
-            4 => ('w', termion::color::Rgb(255,255,255)),
-            5 => ('A', termion::color::Rgb(255, 10,255)),
-            _ => ('?', termion::color::Rgb(255,  0,  0)),
-        };
-
-        for i in 0..DISPLAY_SIZE[1] {
-            grid[i as usize][x as usize] = if i < draw_start || i > draw_end {
-                ('.', termion::color::Rgb(100, 100, 100))
-            } else {
-                (character, if side==0 {color} else {termion::color::Rgb(color.0/2,color.1/2,color.2/2)})
+            let ray_origin = vm::vec3_add(pos, vm::vec3_add(vm::vec3_add(vm::vec3_scale(right, u), vm::vec3_scale(up, v)), vm::vec3_scale(dir, f)));
+            let ray_dir = vm::vec3_sub(ray_origin, pos);
+            let tile = raymarch(pos, ray_dir);
+            writeln!(stderr, "up: {:?}, right: {:?}, forward: {:?}", up, right, dir);
+            grid[y][x] = match tile {
+                1 => ('r', termion::color::Rgb(255, 10, 10)),
+                2 => ('g', termion::color::Rgb( 10,255, 10)),
+                3 => ('b', termion::color::Rgb( 10, 10,255)),
+                4 => ('w', termion::color::Rgb(255,255,255)),
+                5 => ('A', termion::color::Rgb(255, 10,255)),
+                _ => ('?', termion::color::Rgb(255,  0,  0)),
             }
         }
     }
 }
+
+fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> u8 {
+    let mut map_pos = [pos[0].round(), pos[1].round(), pos[2].round()];
+    let mut side_dist = [0.0, 0.0, 0.0];
+    let dir2 = [dir[0]*dir[0], dir[1]*dir[1], dir[2]*dir[2]];
+    let delta_dist = [(1.0             + dir2[1]/dir2[0] + dir2[2]/dir2[0]).sqrt(),
+                      (dir2[0]/dir2[1] + 1.0             + dir2[2]/dir2[1]).sqrt(),
+                      (dir2[0]/dir2[2] + dir2[1]/dir2[2] + 1.0            ).sqrt(),
+    ];
+    let mut step = [0.0, 0.0, 0.0];
+    let mut side_dist = [0.0, 0.0, 0.0];
+    for i in 0..3 {
+        if dir[i] < 0.0 {
+            step[i] = -1.0;
+            side_dist[i] = (pos[i] - map_pos[i]) * delta_dist[i];
+        } else {
+            step[i] = 1.0;
+            side_dist[i] = (map_pos[i] + 1.0 - pos[i]) * delta_dist[i];
+        }
+    }
+    for _ in 0..50 {
+        if side_dist[0] < side_dist[1] && side_dist[0] < side_dist[2] {
+            side_dist[0] += delta_dist[0];
+            map_pos[0] += step[0];
+        } else if side_dist[1] < side_dist[2] {
+            side_dist[1] += delta_dist[1];
+            map_pos[1] += step[1];
+        } else {
+            side_dist[2] += delta_dist[2];
+            map_pos[2] += step[2];
+        }
+        let tile = get_tile_at_pos([map_pos[0] as usize, map_pos[1] as usize, map_pos[2] as usize]);
+        if tile > 0 {
+            return tile;
+        }
+    }
+    return 0;
+}
+
+fn get_tile_at_pos(pos: [usize; 3]) -> u8 {
+    // Y is up
+    let (x, y, z) = (pos[0], pos[1], pos[2]);
+    let tile2d = WORLD_MAP[x][z];
+    match tile2d {
+        //1 => if y <= 1 { 1 } else { 0 },
+        2 => if y <= 2 { 2 } else { 0 },
+        3 => if y <= 3 { 3 } else { 0 },
+        4 => if y <= 4 { 4 } else { 0 },
+        5 => if y <= 5 { 5 } else { 0 },
+        id => id,
+    }
+}
+
+fn rotate_x(dir: &[f64; 3], angle: f64) -> [f64; 3] {
+    [
+        dir[0],
+        dir[1] * angle.cos() - dir[2] * angle.sin(),
+        dir[1] * angle.sin() + dir[2] * angle.cos(),
+    ]
+}
+
+fn rotate_y(dir: &[f64; 3], angle: f64) -> [f64; 3] {
+    [
+        dir[0] * angle.cos() + dir[2] * angle.sin(),
+        dir[2],
+        - dir[0] * angle.sin() + dir[2] * angle.cos(),
+    ]
+}
+
