@@ -188,6 +188,11 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> (u8, u8) {
 
 fn get_tile_at_pos(pos: [f64; 3]) -> u8 {
     // Y is up
+    for i in 0..3 {
+        if pos[i] < 0.0 || pos[i] >= 24.0 {
+            return 1;
+        }
+    }
     let (x, y, z) = (pos[0].floor() as usize, pos[1].floor() as usize, pos[2].floor() as usize);
     let tile2d = WORLD_MAP[x][z];
     match tile2d {
