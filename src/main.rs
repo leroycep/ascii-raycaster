@@ -6,7 +6,7 @@ use termion::screen::AlternateScreen;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use std::io::{Write, stdout, stdin, stderr};
+use std::io::{Write, stdout};
 use std::{time, thread};
 
 const WORLD_MAP: [[u8; 24]; 24] =
@@ -41,14 +41,10 @@ const TURN_SPEED: f64 = 0.03;
 
 fn main() {
     let mut stdin = termion::async_stdin().keys();
-    let mut stderr = stderr();
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
     let mut pos = [22.0, 1.6, 22.0];
     let mut dir = [1.0, 0.0, 0.0];
-
-    let mut time = 0;
-    let mut old_time = 0;
 
     let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
     let mut draw_buffer = String::new();
@@ -63,22 +59,22 @@ fn main() {
             match key {
                 Ok(Key::Char('q')) => break 'MAIN,
                 Ok(Key::Char('i')) => {
-                    let next_x = (pos[0] + dir[0] * MOVE_SPEED);
+                    let next_x = pos[0] + dir[0] * MOVE_SPEED;
                     if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
                         pos[0] = next_x;
                     }
-                    let next_z = (pos[2] + dir[2] * MOVE_SPEED);
+                    let next_z = pos[2] + dir[2] * MOVE_SPEED;
                     if get_tile_at_pos([pos[0], pos[1], next_x]) == 0 {
                         pos[2] = next_z;
                     }
                     moved = true;
                 }
                 Ok(Key::Char('k')) => {
-                    let next_x = (pos[0] + dir[0] * -MOVE_SPEED);
+                    let next_x = pos[0] + dir[0] * -MOVE_SPEED;
                     if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
                         pos[0] = next_x;
                     }
-                    let next_z = (pos[2] + dir[2] * -MOVE_SPEED);
+                    let next_z = pos[2] + dir[2] * -MOVE_SPEED;
                     if get_tile_at_pos([pos[0], pos[1], next_x]) == 0 {
                         pos[2] = next_z;
                     }
@@ -102,15 +98,15 @@ fn main() {
             use std::fmt::Write;
             for row in grid.iter() {
                 for col in row.iter() {
-                    write!(draw_buffer, "{}{}", termion::color::Fg(col.1), col.0);
+                    let _ = write!(draw_buffer, "{}{}", termion::color::Fg(col.1), col.0);
                 }
-                write!(draw_buffer, "\r\n");
+                let _ = write!(draw_buffer, "\r\n");
             }
-            write!(screen,
+            let _ = write!(screen,
                    "{}{}",
                    //termion::clear::All,
                    termion::cursor::Goto(1, 1), draw_buffer);
-            screen.flush();
+            let _ = screen.flush();
             moved = false;
         }
         thread::sleep(time::Duration::from_millis(20));
@@ -118,7 +114,6 @@ fn main() {
 }
 
 fn draw(pos: [f64; 3], dir: [f64; 3], grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
-    let mut stderr = stderr();
     for y in 0..DISPLAY_SIZE[1] as usize {
         for x in 0..DISPLAY_SIZE[0] as usize {
             let right = rotate_y(&dir, (-90.0f64).to_radians());
@@ -146,7 +141,6 @@ fn draw(pos: [f64; 3], dir: [f64; 3], grid: &mut [[(char, termion::color::Rgb); 
 
 fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> (u8, u8) {
     let mut map_pos = [pos[0].round(), pos[1].round(), pos[2].round()];
-    let mut side_dist = [0.0, 0.0, 0.0];
     let dir2 = [dir[0]*dir[0], dir[1]*dir[1], dir[2]*dir[2]];
     let delta_dist = [(1.0             + dir2[1]/dir2[0] + dir2[2]/dir2[0]).sqrt(),
                       (dir2[0]/dir2[1] + 1.0             + dir2[2]/dir2[1]).sqrt(),
@@ -154,7 +148,7 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> (u8, u8) {
     ];
     let mut step = [0.0, 0.0, 0.0];
     let mut side_dist = [0.0, 0.0, 0.0];
-    let mut side = 1;
+    let mut side;
     for i in 0..3 {
         if dir[i] < 0.0 {
             step[i] = -1.0;
@@ -203,14 +197,6 @@ fn get_tile_at_pos(pos: [f64; 3]) -> u8 {
         5 => if y <= 5 { 5 } else { 0 },
         id => id,
     }
-}
-
-fn rotate_x(dir: &[f64; 3], angle: f64) -> [f64; 3] {
-    [
-        dir[0],
-        dir[1] * angle.cos() - dir[2] * angle.sin(),
-        dir[1] * angle.sin() + dir[2] * angle.cos(),
-    ]
 }
 
 fn rotate_y(dir: &[f64; 3], angle: f64) -> [f64; 3] {
