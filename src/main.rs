@@ -53,6 +53,7 @@ fn main() {
     let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
     let mut draw_buffer = String::new();
     'MAIN: loop {
+        let mut moved = false;
         loop {
             let next = stdin.next();
             if !next.is_some() {
@@ -70,7 +71,7 @@ fn main() {
                     if WORLD_MAP[pos[0] as usize][next_y as usize] == 0 {
                         pos[1] = next_y;
                     }
-                    writeln!(stderr, "{:?}", pos);
+                    moved = true;
                 }
                 Ok(Key::Char('k')) => {
                     let next_x = (pos[0] + dir[0] * -MOVE_SPEED);
@@ -81,38 +82,42 @@ fn main() {
                     if WORLD_MAP[pos[0] as usize][next_y as usize] == 0 {
                         pos[1] = next_y;
                     }
-                    writeln!(stderr, "{:?}", pos);
+                    moved = true;
                 }
                 Ok(Key::Char('l')) => {
                     dir = [dir[0] * (-TURN_SPEED).cos() - dir[1] * (-TURN_SPEED).sin(),
                            dir[0] * (-TURN_SPEED).sin() + dir[1] * (-TURN_SPEED).cos()];
                     plane = [plane[0] * (-TURN_SPEED).cos() - plane[1] * (-TURN_SPEED).sin(),
                              plane[0] * (-TURN_SPEED).sin() + plane[1] * (-TURN_SPEED).cos()];
+                    moved = true;
                 }
                 Ok(Key::Char('j')) => {
                     dir = [dir[0] * (TURN_SPEED).cos() - dir[1] * (TURN_SPEED).sin(),
                            dir[0] * (TURN_SPEED).sin() + dir[1] * (TURN_SPEED).cos()];
                     plane = [plane[0] * (TURN_SPEED).cos() - plane[1] * (TURN_SPEED).sin(),
                              plane[0] * (TURN_SPEED).sin() + plane[1] * (TURN_SPEED).cos()];
+                    moved = true;
                 }
 
                 _ => {}
             }
         }
-        draw(pos, dir, plane, &mut grid);
-        draw_buffer.clear();
-        use std::fmt::Write;
-        for row in grid.iter() {
-            for col in row.iter() {
-                write!(draw_buffer, "{}{}", termion::color::Fg(col.1), col.0);
+        if moved {
+            draw(pos, dir, plane, &mut grid);
+            draw_buffer.clear();
+            use std::fmt::Write;
+            for row in grid.iter() {
+                for col in row.iter() {
+                    write!(draw_buffer, "{}{}", termion::color::Fg(col.1), col.0);
+                }
+                write!(draw_buffer, "\r\n");
             }
-            write!(draw_buffer, "\r\n");
+            write!(screen,
+                   "{}{}",
+                   //termion::clear::All,
+                   termion::cursor::Goto(1, 1), draw_buffer);
+            screen.flush();
         }
-        write!(screen,
-               "{}{}{}",
-               termion::clear::All,
-               termion::cursor::Goto(1, 1), draw_buffer);
-        screen.flush();
         thread::sleep(time::Duration::from_millis(20));
     }
 }
