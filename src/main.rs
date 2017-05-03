@@ -5,7 +5,7 @@ use termion::screen::AlternateScreen;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use std::io::{Write, stdout, stdin};
+use std::io::{Write, stdout, stdin, stderr};
 use std::{time, thread};
 
 const WORLD_MAP: [[u8; 24]; 24] =
@@ -34,12 +34,13 @@ const WORLD_MAP: [[u8; 24]; 24] =
      [1, 4, 4, 4, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1],
      [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]];
 
-const DISPLAY_SIZE: [isize; 2] = [80, 40];
+const DISPLAY_SIZE: [isize; 2] = [120, 60];
 const MOVE_SPEED: f64 = 0.75;
 const TURN_SPEED: f64 = 0.03;
 
 fn main() {
     let mut stdin = termion::async_stdin().keys();
+    let mut stderr = stderr();
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
     let mut pos = [22.0, 12.0];
@@ -49,7 +50,8 @@ fn main() {
     let mut time = 0;
     let mut old_time = 0;
 
-    let mut grid = [[('.', termion::color::Rgb(0,0,0)); 80]; 40];
+    let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
+    let mut draw_buffer = String::new();
     'MAIN: loop {
         loop {
             let next = stdin.next();
@@ -68,6 +70,7 @@ fn main() {
                     if WORLD_MAP[pos[0] as usize][next_y as usize] == 0 {
                         pos[1] = next_y;
                     }
+                    writeln!(stderr, "{:?}", pos);
                 }
                 Ok(Key::Char('k')) => {
                     let next_x = (pos[0] + dir[0] * -MOVE_SPEED);
@@ -78,6 +81,7 @@ fn main() {
                     if WORLD_MAP[pos[0] as usize][next_y as usize] == 0 {
                         pos[1] = next_y;
                     }
+                    writeln!(stderr, "{:?}", pos);
                 }
                 Ok(Key::Char('l')) => {
                     dir = [dir[0] * (-TURN_SPEED).cos() - dir[1] * (-TURN_SPEED).sin(),
@@ -96,25 +100,27 @@ fn main() {
             }
         }
         draw(pos, dir, plane, &mut grid);
-        write!(screen,
-               "{}{}",
-               termion::clear::All,
-               termion::cursor::Goto(1, 1));
+        draw_buffer.clear();
+        use std::fmt::Write;
         for row in grid.iter() {
             for col in row.iter() {
-                write!(screen, "{}{}", termion::color::Fg(col.1), col.0);
+                write!(draw_buffer, "{}{}", termion::color::Fg(col.1), col.0);
             }
-            write!(screen, "\r\n");
+            write!(draw_buffer, "\r\n");
         }
+        write!(screen,
+               "{}{}{}",
+               termion::clear::All,
+               termion::cursor::Goto(1, 1), draw_buffer);
         screen.flush();
         thread::sleep(time::Duration::from_millis(20));
     }
 }
 
-fn draw(pos: [f64; 2], dir: [f64; 2], plane: [f64; 2], grid: &mut [[(char, termion::color::Rgb); 80]; 40]) {
+fn draw(pos: [f64; 2], dir: [f64; 2], plane: [f64; 2], grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
     for x in 0..DISPLAY_SIZE[0] {
         let camera_x = 2.0 * x as f64 / DISPLAY_SIZE[0] as f64 - 1.0;
-        let mut ray_pos = pos;
+        let ray_pos = pos;
         let ray_dir = [dir[0] + plane[0] * camera_x, dir[1] + plane[1] * camera_x];
 
         let mut map_pos = [ray_pos[0] as isize, ray_pos[1] as isize];
@@ -128,14 +134,14 @@ fn draw(pos: [f64; 2], dir: [f64; 2], plane: [f64; 2], grid: &mut [[(char, termi
             step[0] = -1;
             side_dist[0] = (ray_pos[0] - map_pos[0] as f64) * delta_dist[0];
         } else {
-            step[0] = -1;
+            step[0] = 1;
             side_dist[0] = (map_pos[0] as f64 + 1.0 - ray_pos[0]) * delta_dist[0];
         }
         if ray_dir[1] < 0.0 {
             step[1] = -1;
             side_dist[1] = (ray_pos[1] - map_pos[1] as f64) * delta_dist[1];
         } else {
-            step[1] = -1;
+            step[1] = 1;
             side_dist[1] = (map_pos[1] as f64 + 1.0 - ray_pos[1]) * delta_dist[1];
         }
         let mut hit = 0;
@@ -159,8 +165,9 @@ fn draw(pos: [f64; 2], dir: [f64; 2], plane: [f64; 2], grid: &mut [[(char, termi
         let perp_wall_dist = if side == 0 {
             (map_pos[0] as f64 - ray_pos[0] + (1.0 - step[0] as f64) / 2.0) / ray_dir[0]
         } else {
-            (map_pos[1] as f64 - ray_pos[1] + (1.1 - step[1] as f64) / 2.0) / ray_dir[1]
+            (map_pos[1] as f64 - ray_pos[1] + (1.0 - step[1] as f64) / 2.0) / ray_dir[1]
         };
+        let perp_wall_dist = if perp_wall_dist as isize > 0 { perp_wall_dist } else { 1.0 };
 
         let line_height = DISPLAY_SIZE[1] / perp_wall_dist as isize;
         let draw_start = DISPLAY_SIZE[1] / 2 - line_height / 2;
