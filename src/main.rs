@@ -121,8 +121,8 @@ fn draw(pos: [f64; 3], dir: [f64; 3], grid: &mut [[(char, termion::color::Rgb); 
     let mut stderr = stderr();
     for y in 0..DISPLAY_SIZE[1] as usize {
         for x in 0..DISPLAY_SIZE[0] as usize {
-            let right = rotate_y(&dir, (-90.0f64).to_radians());
-            let up = vm::vec3_cross(dir, right);
+            let right = rotate_y(&dir, (90.0f64).to_radians());
+            let up = [0.0, 1.0, 0.0];
 
             let u = (x as f64 * 2.0 / DISPLAY_SIZE[0] as f64) - 1.0;
             let v = (y as f64 * 2.0 / DISPLAY_SIZE[1] as f64) - 1.0;
@@ -207,7 +207,7 @@ fn rotate_x(dir: &[f64; 3], angle: f64) -> [f64; 3] {
 fn rotate_y(dir: &[f64; 3], angle: f64) -> [f64; 3] {
     [
         dir[0] * angle.cos() + dir[2] * angle.sin(),
-        dir[2],
+        dir[1],
         - dir[0] * angle.sin() + dir[2] * angle.cos(),
     ]
 }
