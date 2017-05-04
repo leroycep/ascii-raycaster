@@ -45,7 +45,8 @@ fn main() {
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
     let mut pos = [22.0, 1.6, 22.0];
-    let mut dir = [1.0, 0.0, 0.0];
+    let mut pitch = 0.0f64;
+    let mut yaw = 0.0f64;
 
     let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
     let mut draw_buffer = String::new();
@@ -60,52 +61,48 @@ fn main() {
             match key {
                 Ok(Key::Char('q')) => break 'MAIN,
                 Ok(Key::Char('i')) => {
-                    let next_x = pos[0] + dir[0] * MOVE_SPEED;
+                    let next_x = pos[0] + MOVE_SPEED * pitch.cos();
                     if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
                         pos[0] = next_x;
                     }
-                    let next_z = pos[2] + dir[2] * MOVE_SPEED;
+                    let next_z = pos[2] + MOVE_SPEED * pitch.sin();
                     if get_tile_at_pos([pos[0], pos[1], next_x]) == 0 {
                         pos[2] = next_z;
                     }
                     moved = true;
                 }
                 Ok(Key::Char('k')) => {
-                    let next_x = pos[0] + dir[0] * -MOVE_SPEED;
+                    let next_x = pos[0] + -MOVE_SPEED * pitch.cos();
                     if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
                         pos[0] = next_x;
                     }
-                    let next_z = pos[2] + dir[2] * -MOVE_SPEED;
+                    let next_z = pos[2] + -MOVE_SPEED * pitch.sin();
                     if get_tile_at_pos([pos[0], pos[1], next_x]) == 0 {
                         pos[2] = next_z;
                     }
                     moved = true;
                 }
                 Ok(Key::Char('l')) => {
-                    dir = rotate_y(&dir, -TURN_SPEED);
+                    pitch += TURN_SPEED;
                     moved = true;
                 }
                 Ok(Key::Char('j')) => {
-                    dir = rotate_y(&dir, TURN_SPEED);
+                    pitch -= TURN_SPEED;
                     moved = true;
                 }
                 Ok(Key::Char('u')) => {
-                    let axis = rotate_y(&[dir[0], 0.0, dir[2]], (90.0f64).to_radians());
-                    let old_dir = dir;
-                    dir = rotate_vec_axis(dir, axis, -TURN_SPEED);
-                    writeln!(stderr, "dir: {:?}, axis: {:?}, dir': {:?}", old_dir, axis, dir);
+                    yaw -= TURN_SPEED;
                     moved = true;
                 }
                 Ok(Key::Char('o')) => {
-                    let axis = rotate_y(&[dir[0], 0.0, dir[2]], (90.0f64).to_radians());
-                    dir = rotate_vec_axis(dir, axis, TURN_SPEED);
+                    yaw += TURN_SPEED;
                     moved = true;
                 }
                 _ => {}
             }
         }
         if moved {
-            draw(pos, dir, &mut grid);
+            draw(pos, pitch, yaw, &mut grid);
             draw_buffer.clear();
             use std::fmt::Write;
             for row in grid.iter() {
@@ -125,12 +122,14 @@ fn main() {
     }
 }
 
-fn draw(pos: [f64; 3], dir: [f64; 3], grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
+fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
+    let dir = [pitch.cos() * yaw.cos(), yaw.sin(), pitch.sin() * yaw.cos()];
+    let right = [(pitch + (90.0f64).to_radians()).cos(), 0.0, (pitch + (90.0f64).to_radians()).sin()];
+    let up = [0.0, -1.0, 0.0];
+    let mut stderr = stderr();
+    writeln!(stderr, "dir: {:?}", dir);
     for y in 0..DISPLAY_SIZE[1] as usize {
         for x in 0..DISPLAY_SIZE[0] as usize {
-            let right = rotate_y(&dir, (-90.0f64).to_radians());
-            let up = [0.0, -1.0, 0.0];
-
             let u = (x as f64 * 2.0 / DISPLAY_SIZE[0] as f64) - 1.0;
             let v = (y as f64 * 2.0 / DISPLAY_SIZE[1] as f64) - 1.0;
             let f = 1.97;
