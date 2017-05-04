@@ -6,7 +6,7 @@ use termion::screen::AlternateScreen;
 use termion::event::Key;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
-use std::io::{Write, stdout};
+use std::io::{Write, stdout, stderr};
 use std::{time, thread};
 
 const WORLD_MAP: [[u8; 24]; 24] =
@@ -41,6 +41,7 @@ const TURN_SPEED: f64 = 0.03;
 
 fn main() {
     let mut stdin = termion::async_stdin().keys();
+    let mut stderr = stderr();
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
     let mut pos = [22.0, 1.6, 22.0];
@@ -88,7 +89,18 @@ fn main() {
                     dir = rotate_y(&dir, TURN_SPEED);
                     moved = true;
                 }
-
+                Ok(Key::Char('u')) => {
+                    let axis = rotate_y(&[dir[0], 0.0, dir[2]], (90.0f64).to_radians());
+                    let old_dir = dir;
+                    dir = rotate_vec_axis(dir, axis, -TURN_SPEED);
+                    writeln!(stderr, "dir: {:?}, axis: {:?}, dir': {:?}", old_dir, axis, dir);
+                    moved = true;
+                }
+                Ok(Key::Char('o')) => {
+                    let axis = rotate_y(&[dir[0], 0.0, dir[2]], (90.0f64).to_radians());
+                    dir = rotate_vec_axis(dir, axis, TURN_SPEED);
+                    moved = true;
+                }
                 _ => {}
             }
         }
@@ -193,7 +205,7 @@ fn get_tile_at_pos(pos: [f64; 3]) -> u8 {
         //1 => if y <= 1 { 1 } else { 0 },
         2 => if y <= 2 { 2 } else { 0 },
         3 => if y <= 3 { 3 } else { 0 },
-        4 => if y <= 4 { 4 } else { 0 },
+        4 => if y <= 1 { 4 } else { 0 },
         5 => if y <= 5 { 5 } else { 0 },
         id => id,
     }
@@ -205,5 +217,23 @@ fn rotate_y(dir: &[f64; 3], angle: f64) -> [f64; 3] {
         dir[1],
         - dir[0] * angle.sin() + dir[2] * angle.cos(),
     ]
+}
+
+fn rotate_vec_axis(vec: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
+    let mut stderr = stderr();
+    let vec_parallel = vm::vec3_scale(axis, vm::vec3_dot(vec, axis) / vm::vec3_dot(axis, axis));
+    let vec_perpendicular = vm::vec3_sub(vec, vec_parallel);
+    let perpendicular_magnitude = vm::vec3_len(vec_perpendicular);
+    let _ = writeln!(stderr, "v||: {:?}, vT: {:?}, ||vT||: {:?}", vec_parallel, vec_perpendicular, perpendicular_magnitude);
+
+    /* Create a second axis so that we have a plane to rotate on */
+    let w = vm::vec3_cross(axis, vec_perpendicular);
+    let wx = angle.cos() / perpendicular_magnitude;
+    let wy = angle.sin() / vm::vec3_len(w);
+
+    let perpendicular_component = vm::vec3_scale(vm::vec3_add(vm::vec3_scale(vec_perpendicular, wx), vm::vec3_scale(w, wy)), perpendicular_magnitude);
+
+    let rotated_vector = vm::vec3_add(perpendicular_component, vec_parallel);
+    rotated_vector
 }
 
