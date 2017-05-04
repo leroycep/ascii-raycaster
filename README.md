@@ -2,6 +2,14 @@
 
 A 3d raycaster that renders to ASCII text.
 
+## Controls
+
+- `i` and `k` to move forward and back
+- `j` and `l` to look left and right
+- `o` and `u` to look up and down
+
+That's all.
+
 ## Why render to ASCII?
 
 Because it's cool.
