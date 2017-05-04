@@ -2,6 +2,10 @@
 
 A 3d raycaster that renders to ASCII text.
 
+![Purple Thing](images/purple-thing.png)
+
+![Blue and green things](images/blue-and-green.png)
+
 ## Controls
 
 - `i` and `k` to move forward and back
