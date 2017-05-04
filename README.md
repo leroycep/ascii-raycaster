@@ -23,9 +23,13 @@ ASCII should let me use a lower resolution.
 ## Links that I used
 
 <http://lodev.org/cgtutor/raycasting.html>
+
 <http://9bitscience.blogspot.com/2013/07/raymarching-distance-fields_14.html>
+
 <http://permadi.com/1996/05/ray-casting-tutorial-table-of-contents/>
+
 [Wikipedia. Lots of wikipedia, on vectors, rotation, and matrices.](https://en.wikipedia.org/)
+
 [Voxel Quest][voxel-quest]
 
 [voxel-quest]: http://www.voxelquest.com/
