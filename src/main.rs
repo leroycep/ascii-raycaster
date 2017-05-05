@@ -102,6 +102,7 @@ fn main() {
     let mut grid = [[('.', [0.0; 3]); 120]; 60];
     let mut moved = true;
     let mut prev_mouse_pos = [0.0; 2];
+    display.get_window().unwrap().set_cursor_state(glium::glutin::CursorState::Hide);
 
     loop {
         shapes.clear();
