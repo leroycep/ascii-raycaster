@@ -103,6 +103,10 @@ fn main() {
     let mut moved = true;
     let mut prev_mouse_pos = [0.0; 2];
     display.get_window().unwrap().set_cursor_state(glium::glutin::CursorState::Hide);
+    let mut btn_forward = false;
+    let mut btn_backward = false;
+    let mut btn_left = false;
+    let mut btn_right = false;
 
     loop {
         shapes.clear();
@@ -151,46 +155,12 @@ fn main() {
                 Event::Closed |
                 Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Escape)) => return,
                 Event::Resized(w, h) => window_size = (w, h),
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::I)) => {
-                    let next_x = pos[0] + MOVE_SPEED * pitch.cos();
-                    if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
-                        pos[0] = next_x;
-                    }
-                    let next_z = pos[2] + MOVE_SPEED * pitch.sin();
-                    if get_tile_at_pos([pos[0], pos[1], next_x]) == 0 {
-                        pos[2] = next_z;
-                    }
-                    moved = true;
-                }
-,
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::K)) => {
-                    let next_x = pos[0] + -MOVE_SPEED * pitch.cos();
-                    if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
-                        pos[0] = next_x;
-                    }
-                    let next_z = pos[2] + -MOVE_SPEED * pitch.sin();
-                    if get_tile_at_pos([pos[0], pos[1], next_x]) == 0 {
-                        pos[2] = next_z;
-                    }
-                    moved = true;
-                }
 
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::L)) => {
-                    pitch += TURN_SPEED;
-                    moved = true;
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::J)) => {
-                    pitch -= TURN_SPEED;
-                    moved = true;
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::U)) => {
-                    yaw -= TURN_SPEED;
-                    moved = true;
-                }
-                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::O)) => {
-                    yaw += TURN_SPEED;
-                    moved = true;
-                }
+                Event::KeyboardInput(state, _, Some(VirtualKeyCode::W)) => btn_forward = state == ElementState::Pressed,
+                Event::KeyboardInput(state, _, Some(VirtualKeyCode::S)) => btn_backward = state == ElementState::Pressed,
+                Event::KeyboardInput(state, _, Some(VirtualKeyCode::A)) => btn_left = state == ElementState::Pressed,
+                Event::KeyboardInput(state, _, Some(VirtualKeyCode::D)) => btn_right = state == ElementState::Pressed,
+                
                 Event::MouseMoved(mouse_x, mouse_y) => {
                     let mouse_pos = [mouse_x as f64, mouse_y as f64];
                     let delta = vm::vec2_sub([window_size.0 as f64/2.0, window_size.1 as f64/2.0], mouse_pos);
@@ -201,6 +171,26 @@ fn main() {
                 }
                 _ => ()
             }
+        }
+
+        let move_angle = match (btn_forward, btn_backward, btn_left, btn_right) {
+            (true, false, false, false) => Some((0.0f64).to_radians()),
+            (false, true, false, false) => Some((180.0f64).to_radians()),
+            (false, false, true, false) => Some((-90.0f64).to_radians()),
+            (false, false, false, true) => Some((90.0f64).to_radians()),
+            _ => None,
+        };
+
+        if let Some(angle) = move_angle {
+            let next_x = pos[0] + MOVE_SPEED * (pitch + angle).cos();
+            if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
+                pos[0] = next_x;
+            }
+            let next_z = pos[2] + MOVE_SPEED * (pitch + angle).sin();
+            if get_tile_at_pos([pos[0], pos[1], next_z]) == 0 {
+                pos[2] = next_z;
+            }
+            moved = true;
         }
 
         display.get_window().unwrap().set_cursor_position(window_size.0 as i32/2, window_size.1 as i32/2);
