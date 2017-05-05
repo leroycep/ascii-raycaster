@@ -138,11 +138,12 @@ fn main() {
         target.finish().unwrap();
 
         for ev in display.poll_events() {
+            use glium::glutin::{Event,ElementState,VirtualKeyCode};
             match ev {
-                glium::glutin::Event::Closed |
-                glium::glutin::Event::ReceivedCharacter('q') => return,
-                glium::glutin::Event::Resized(w, h) => window_size = (w, h),
-                glium::glutin::Event::ReceivedCharacter('r') => println!("tile_size: {:?}, window_size: {:?}", tile_size, window_size),
+                Event::Closed |
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Escape)) => return,
+                Event::Resized(w, h) => window_size = (w, h),
+                Event::ReceivedCharacter('r') => println!("tile_size: {:?}, window_size: {:?}", tile_size, window_size),
                 _ => ()
             }
         }
