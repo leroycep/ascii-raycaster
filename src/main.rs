@@ -49,8 +49,9 @@ fn main() {
     let display = glium::glutin::WindowBuilder::new().with_gl(gl_request).build_glium().unwrap();
 
     use std::io::Cursor;
-    let image = image::load(Cursor::new(&include_bytes!("../assets/Potash_10x10.png")[..]),
-                           image::PNG).unwrap().to_rgba();
+    use std::path::Path;
+    let path = Path::new("assets/Potash_10x10.png");
+    let image = image::open(&path).unwrap().to_rgba();
     let image_dimensions = image.dimensions();
     let tile_size = (image_dimensions.0 / 16, image_dimensions.1 / 16);
     let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
