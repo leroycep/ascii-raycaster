@@ -59,17 +59,9 @@ fn main() {
     let image = image::load(Cursor::new(&include_bytes!("../assets/Potash_10x10.png")[..]),
                            image::PNG).unwrap().to_rgba();
     let image_dimensions = image.dimensions();
-    let image = glium::texture::RawImage2d::from_raw_rgba_reversed(image.into_raw(), image_dimensions);
+    let tile_size = (image_dimensions.0 / 16, image_dimensions.1 / 16);
+    let image = glium::texture::RawImage2d::from_raw_rgba(image.into_raw(), image_dimensions);
     let texture = glium::texture::Texture2d::new(&display, image).unwrap();
-
-    let vertex1 = Vertex { position: [-1.0, -1.0], tex_coords: [0.0, 0.0] };
-    let vertex2 = Vertex { position: [1.0, -1.0], tex_coords: [1.0, 0.0] };
-    let vertex3 = Vertex { position: [-1.0, 1.0], tex_coords: [0.0, 1.0] };
-    let vertex4 = Vertex { position: [1.0, 1.0], tex_coords: [1.0, 1.0] };
-    let shape = vec![vertex1, vertex2, vertex3, vertex4, vertex2, vertex3];
-
-    let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
-    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
 
     let vertex_shader_src = r#"
         #version 120
@@ -99,11 +91,47 @@ fn main() {
 
     let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
 
+    let mut window_size = (1, 1);
+
+    let mut shapes = vec![];
+    let mut indices = vec![];
+    let message = b"Hello, world!";
     loop {
+        shapes.clear();
+        indices.clear();
+        let mut message_index = 0;
+        for y in 0..(window_size.1/tile_size.1) {
+            for x in 0..(window_size.0/tile_size.0) {
+                let x0 = ((x * tile_size.0) as f32 / window_size.0 as f32) * 2.0 - 1.0;
+                let x1 = (((x+1) * tile_size.0) as f32 / window_size.0 as f32) * 2.0 - 1.0;
+                let y0 = ((y * tile_size.1) as f32 / window_size.1 as f32) * -2.0 + 1.0;
+                let y1 = (((y+1) * tile_size.1) as f32 / window_size.1 as f32) * -2.0 + 1.0;
+                let tex_tile_size = [tile_size.0 as f32 / image_dimensions.0 as f32, tile_size.1 as f32 / image_dimensions.1 as f32];
+
+                let tile_index = message[message_index];
+                message_index += 1;
+                if message_index >= message.len() { message_index = 0 }
+                let tile_coords = [(tile_index % 16) as f32, ((tile_index >> 4)) as f32];
+                let tx0 = tile_coords[0] * tex_tile_size[0];
+                let tx1 = (tile_coords[0]+1.0) * tex_tile_size[0];
+                let ty0 = tile_coords[1] * tex_tile_size[1];
+                let ty1 = (tile_coords[1]+1.0) * tex_tile_size[1];
+                let index = shapes.len() as u16;
+                shapes.push(Vertex { position: [x0, y0], tex_coords: [tx0, ty0] });
+                shapes.push(Vertex { position: [x1, y0], tex_coords: [tx1, ty0] });
+                shapes.push(Vertex { position: [x0, y1], tex_coords: [tx0, ty1] });
+                shapes.push(Vertex { position: [x1, y1], tex_coords: [tx1, ty1] });
+                indices.extend_from_slice(&[index, index+1, index+2, index+3, index+1, index+2]);
+            }
+        }
+
+        let vertex_buffer = glium::VertexBuffer::new(&display, &shapes).unwrap();
+        let indices = glium::index::IndexBuffer::new(&display, glium::index::PrimitiveType::TrianglesList, &indices).unwrap();
+
         use glium::Surface;
         let mut target = display.draw();
         let uniforms = uniform! {
-            tex: &texture,
+            tex: texture.sampled().magnify_filter(glium::uniforms::MagnifySamplerFilter::Nearest),
         };
         target.clear_color(0.0, 0.0, 1.0, 1.0);
         target.draw(&vertex_buffer, &indices, &program, &uniforms, &Default::default()).unwrap();
@@ -113,6 +141,8 @@ fn main() {
             match ev {
                 glium::glutin::Event::Closed |
                 glium::glutin::Event::ReceivedCharacter('q') => return,
+                glium::glutin::Event::Resized(w, h) => window_size = (w, h),
+                glium::glutin::Event::ReceivedCharacter('r') => println!("tile_size: {:?}, window_size: {:?}", tile_size, window_size),
                 _ => ()
             }
         }
