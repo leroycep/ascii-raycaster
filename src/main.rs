@@ -101,6 +101,7 @@ fn main() {
 
     let mut grid = [[('.', [0.0; 3]); 120]; 60];
     let mut moved = true;
+    let mut prev_mouse_pos = [0.0; 2];
 
     loop {
         shapes.clear();
@@ -189,9 +190,19 @@ fn main() {
                     yaw += TURN_SPEED;
                     moved = true;
                 }
+                Event::MouseMoved(mouse_x, mouse_y) => {
+                    let mouse_pos = [mouse_x as f64, mouse_y as f64];
+                    let delta = vm::vec2_sub([window_size.0 as f64/2.0, window_size.1 as f64/2.0], mouse_pos);
+                    let delta = [delta[0] / window_size.0 as f64, delta[1] / window_size.1 as f64];
+                    pitch -= delta[0];
+                    yaw += delta[1];
+                    moved = true;
+                }
                 _ => ()
             }
         }
+
+        display.get_window().unwrap().set_cursor_position(window_size.0 as i32/2, window_size.1 as i32/2);
 
         if moved {
             draw(pos, pitch, yaw, &mut grid);
