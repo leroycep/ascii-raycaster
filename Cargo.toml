@@ -6,5 +6,4 @@ authors = ["LeRoyce Pearson <minergeemili@gmail.com>"]
 [dependencies]
 glium = "*"
 image = "*"
-termion = "*"
 vecmath = "0.3"

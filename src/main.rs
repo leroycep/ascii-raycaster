@@ -1,16 +1,8 @@
 
 #[macro_use]
 extern crate glium;
-extern crate termion;
 extern crate vecmath as vm;
 extern crate image;
-
-use termion::screen::AlternateScreen;
-use termion::event::Key;
-use termion::input::TermRead;
-use termion::raw::IntoRawMode;
-use std::io::{Write, stdout, stderr};
-use std::{time, thread};
 
 const WORLD_MAP: [[u8; 24]; 24] =
     [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
@@ -46,9 +38,10 @@ const TURN_SPEED: f64 = 0.03;
 struct Vertex {
     position: [f32; 2],
     tex_coords: [f32; 2],
+    color: [f32; 3],
 }
 
-implement_vertex!(Vertex, position, tex_coords);
+implement_vertex!(Vertex, position, tex_coords, color);
 
 fn main() {
     use glium::DisplayBuild;
@@ -68,11 +61,14 @@ fn main() {
 
         attribute vec2 position;
         attribute vec2 tex_coords;
+        attribute vec3 color;
 
         varying vec2 v_tex_coords;
+        varying vec3 v_color;
 
         void main() {
             v_tex_coords = tex_coords;
+            v_color = color;
             gl_Position = vec4(position, 0.0, 1.0);
         }
     "#;
@@ -81,11 +77,13 @@ fn main() {
         #version 120
 
         varying vec2 v_tex_coords;
+        varying vec3 v_color;
 
         uniform sampler2D tex;
 
         void main() {
-            gl_FragColor = texture2D(tex, v_tex_coords);
+            vec4 pixel = texture2D(tex, v_tex_coords);
+            gl_FragColor = vec4(pixel.rgb * v_color.rgb, pixel.a);
         }
     "#;
 
@@ -95,13 +93,12 @@ fn main() {
 
     let mut shapes = vec![];
     let mut indices = vec![];
-    let message = b"Hello, world!";
 
     let mut pos = [22.0, 1.6, 22.0];
     let mut pitch = 0.0f64;
     let mut yaw = 0.0f64;
 
-    let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
+    let mut grid = [[('.', [0.0; 3]); 120]; 60];
     let mut moved = true;
 
     loop {
@@ -115,7 +112,9 @@ fn main() {
                 let y1 = (((y+1) * tile_size.1) as f32 / window_size.1 as f32) * -2.0 + 1.0;
                 let tex_tile_size = [tile_size.0 as f32 / image_dimensions.0 as f32, tile_size.1 as f32 / image_dimensions.1 as f32];
 
-                let tile_index = if x < 120 && y < 60 { grid[y as usize][x as usize].0 as u8 } else { 0 };
+                let tile = if x < 120 && y < 60 { grid[y as usize][x as usize] } else { (' ',[0.0,0.0,0.0]) };
+                let tile_index = tile.0 as u8;
+                let color = tile.1;
 
                 let tile_coords = [(tile_index % 16) as f32, ((tile_index >> 4)) as f32];
                 let tx0 = tile_coords[0] * tex_tile_size[0];
@@ -123,10 +122,10 @@ fn main() {
                 let ty0 = tile_coords[1] * tex_tile_size[1];
                 let ty1 = (tile_coords[1]+1.0) * tex_tile_size[1];
                 let index = shapes.len() as u16;
-                shapes.push(Vertex { position: [x0, y0], tex_coords: [tx0, ty0] });
-                shapes.push(Vertex { position: [x1, y0], tex_coords: [tx1, ty0] });
-                shapes.push(Vertex { position: [x0, y1], tex_coords: [tx0, ty1] });
-                shapes.push(Vertex { position: [x1, y1], tex_coords: [tx1, ty1] });
+                shapes.push(Vertex { position: [x0, y0], tex_coords: [tx0, ty0], color: color });
+                shapes.push(Vertex { position: [x1, y0], tex_coords: [tx1, ty0], color: color });
+                shapes.push(Vertex { position: [x0, y1], tex_coords: [tx0, ty1], color: color });
+                shapes.push(Vertex { position: [x1, y1], tex_coords: [tx1, ty1], color: color });
                 indices.extend_from_slice(&[index, index+1, index+2, index+3, index+1, index+2]);
             }
         }
@@ -207,12 +206,10 @@ fn main() {
     */
 }
 
-fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
+fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, [f32; 3]); 120]; 60]) {
     let dir = [pitch.cos() * yaw.cos(), yaw.sin(), pitch.sin() * yaw.cos()];
     let right = [(pitch + (90.0f64).to_radians()).cos(), 0.0, (pitch + (90.0f64).to_radians()).sin()];
     let up = [0.0, -1.0, 0.0];
-    let mut stderr = stderr();
-    writeln!(stderr, "dir: {:?}", dir);
     for y in 0..DISPLAY_SIZE[1] as usize {
         for x in 0..DISPLAY_SIZE[0] as usize {
             let u = (x as f64 * 2.0 / DISPLAY_SIZE[0] as f64) - 1.0;
@@ -222,14 +219,14 @@ fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, termion::color:
             let ray_origin = vm::vec3_add(pos, vm::vec3_add(vm::vec3_add(vm::vec3_scale(right, u), vm::vec3_scale(up, v)), vm::vec3_scale(dir, f)));
             let ray_dir = vm::vec3_sub(ray_origin, pos);
             let (tile, side) = raymarch(pos, ray_dir);
-            //writeln!(stderr, "up: {:?}, right: {:?}, forward: {:?}", up, right, dir);
+            let side = side as f32;
             grid[y][x] = match tile {
-                1 => ('r', termion::color::Rgb(255/side, 10/side, 10/side)),
-                2 => ('g', termion::color::Rgb( 10/side,255/side, 10/side)),
-                3 => ('b', termion::color::Rgb( 10/side, 10/side,255/side)),
-                4 => ('w', termion::color::Rgb(255/side,255/side,255/side)),
-                5 => ('A', termion::color::Rgb(255/side, 10/side,255/side)),
-                _ => (' ', termion::color::Rgb(  0/side,  0/side,  0/side)),
+                1 => ('r', [1.0/side,0.02/side,0.02/side]),
+                2 => ('g', [0.02/side,1.0/side,0.02/side]),
+                3 => ('b', [0.02/side,0.02/side,1.0/side]),
+                4 => ('w', [1.0/side,1.0/side,1.0/side]),
+                5 => ('A', [1.0/side,0.02/side,1.0/side]),
+                _ => (' ', [0.0/side,0.0/side,0.0/side]),
             }
         }
     }
@@ -304,11 +301,9 @@ fn rotate_y(dir: &[f64; 3], angle: f64) -> [f64; 3] {
 }
 
 fn rotate_vec_axis(vec: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
-    let mut stderr = stderr();
     let vec_parallel = vm::vec3_scale(axis, vm::vec3_dot(vec, axis) / vm::vec3_dot(axis, axis));
     let vec_perpendicular = vm::vec3_sub(vec, vec_parallel);
     let perpendicular_magnitude = vm::vec3_len(vec_perpendicular);
-    let _ = writeln!(stderr, "v||: {:?}, vT: {:?}, ||vT||: {:?}", vec_parallel, vec_perpendicular, perpendicular_magnitude);
 
     /* Create a second axis so that we have a plane to rotate on */
     let w = vm::vec3_cross(axis, vec_perpendicular);
