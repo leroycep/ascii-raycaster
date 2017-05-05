@@ -96,10 +96,17 @@ fn main() {
     let mut shapes = vec![];
     let mut indices = vec![];
     let message = b"Hello, world!";
+
+    let mut pos = [22.0, 1.6, 22.0];
+    let mut pitch = 0.0f64;
+    let mut yaw = 0.0f64;
+
+    let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
+    let mut moved = true;
+
     loop {
         shapes.clear();
         indices.clear();
-        let mut message_index = 0;
         for y in 0..(window_size.1/tile_size.1) {
             for x in 0..(window_size.0/tile_size.0) {
                 let x0 = ((x * tile_size.0) as f32 / window_size.0 as f32) * 2.0 - 1.0;
@@ -108,9 +115,8 @@ fn main() {
                 let y1 = (((y+1) * tile_size.1) as f32 / window_size.1 as f32) * -2.0 + 1.0;
                 let tex_tile_size = [tile_size.0 as f32 / image_dimensions.0 as f32, tile_size.1 as f32 / image_dimensions.1 as f32];
 
-                let tile_index = message[message_index];
-                message_index += 1;
-                if message_index >= message.len() { message_index = 0 }
+                let tile_index = if x < 120 && y < 60 { grid[y as usize][x as usize].0 as u8 } else { 0 };
+
                 let tile_coords = [(tile_index % 16) as f32, ((tile_index >> 4)) as f32];
                 let tx0 = tile_coords[0] * tex_tile_size[0];
                 let tx1 = (tile_coords[0]+1.0) * tex_tile_size[0];
@@ -143,32 +149,7 @@ fn main() {
                 Event::Closed |
                 Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::Escape)) => return,
                 Event::Resized(w, h) => window_size = (w, h),
-                Event::ReceivedCharacter('r') => println!("tile_size: {:?}, window_size: {:?}", tile_size, window_size),
-                _ => ()
-            }
-        }
-    }
-    /*let mut stdin = termion::async_stdin().keys();
-    let mut stderr = stderr();
-    let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
-
-    let mut pos = [22.0, 1.6, 22.0];
-    let mut pitch = 0.0f64;
-    let mut yaw = 0.0f64;
-
-    let mut grid = [[('.', termion::color::Rgb(0,0,0)); 120]; 60];
-    let mut draw_buffer = String::new();
-    let mut moved = true;
-    'MAIN: loop {
-        loop {
-            let next = stdin.next();
-            if !next.is_some() {
-                break;
-            }
-            let key = next.unwrap();
-            match key {
-                Ok(Key::Char('q')) => break 'MAIN,
-                Ok(Key::Char('i')) => {
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::I)) => {
                     let next_x = pos[0] + MOVE_SPEED * pitch.cos();
                     if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
                         pos[0] = next_x;
@@ -179,7 +160,8 @@ fn main() {
                     }
                     moved = true;
                 }
-                Ok(Key::Char('k')) => {
+,
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::K)) => {
                     let next_x = pos[0] + -MOVE_SPEED * pitch.cos();
                     if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
                         pos[0] = next_x;
@@ -190,44 +172,39 @@ fn main() {
                     }
                     moved = true;
                 }
-                Ok(Key::Char('l')) => {
+
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::L)) => {
                     pitch += TURN_SPEED;
                     moved = true;
                 }
-                Ok(Key::Char('j')) => {
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::J)) => {
                     pitch -= TURN_SPEED;
                     moved = true;
                 }
-                Ok(Key::Char('u')) => {
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::U)) => {
                     yaw -= TURN_SPEED;
                     moved = true;
                 }
-                Ok(Key::Char('o')) => {
+                Event::KeyboardInput(ElementState::Pressed, _, Some(VirtualKeyCode::O)) => {
                     yaw += TURN_SPEED;
                     moved = true;
                 }
-                _ => {}
+                _ => ()
             }
         }
+
         if moved {
             draw(pos, pitch, yaw, &mut grid);
-            draw_buffer.clear();
-            use std::fmt::Write;
-            for row in grid.iter() {
-                for col in row.iter() {
-                    let _ = write!(draw_buffer, "{}{}", termion::color::Fg(col.1), col.0);
-                }
-                let _ = write!(draw_buffer, "\r\n");
-            }
-            let _ = write!(screen,
-                   "{}{}",
-                   //termion::clear::All,
-                   termion::cursor::Goto(1, 1), draw_buffer);
-            let _ = screen.flush();
             moved = false;
         }
+    }
+
+    /*
+    let mut draw_buffer = String::new();
+    'MAIN: loop {
         thread::sleep(time::Duration::from_millis(20));
-    }*/
+    }
+    */
 }
 
 fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
