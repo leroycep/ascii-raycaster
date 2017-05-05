@@ -32,7 +32,7 @@ const WORLD_MAP: [[u8; 24]; 24] =
 
 const DISPLAY_SIZE: [isize; 2] = [120, 60];
 const MOVE_SPEED: f64 = 0.75;
-const TURN_SPEED: f64 = 0.03;
+const TURN_SPEED: f64 = 0.9;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -48,7 +48,6 @@ fn main() {
     let gl_request = glium::glutin::GlRequest::Specific(glium::glutin::Api::OpenGl, (2,1));
     let display = glium::glutin::WindowBuilder::new().with_gl(gl_request).build_glium().unwrap();
 
-    use std::io::Cursor;
     use std::path::Path;
     let path = Path::new("assets/Potash_10x10.png");
     let image = image::open(&path).unwrap().to_rgba();
@@ -101,8 +100,7 @@ fn main() {
 
     let mut grid = [[('.', [0.0; 3]); 120]; 60];
     let mut moved = true;
-    let mut prev_mouse_pos = [0.0; 2];
-    display.get_window().unwrap().set_cursor_state(glium::glutin::CursorState::Hide);
+    let _ = display.get_window().unwrap().set_cursor_state(glium::glutin::CursorState::Hide);
     let mut btn_forward = false;
     let mut btn_backward = false;
     let mut btn_left = false;
@@ -165,8 +163,8 @@ fn main() {
                     let mouse_pos = [mouse_x as f64, mouse_y as f64];
                     let delta = vm::vec2_sub([window_size.0 as f64/2.0, window_size.1 as f64/2.0], mouse_pos);
                     let delta = [delta[0] / window_size.0 as f64, delta[1] / window_size.1 as f64];
-                    pitch -= delta[0];
-                    yaw += delta[1];
+                    pitch -= delta[0] * TURN_SPEED;
+                    yaw += delta[1] * TURN_SPEED;
                     moved = true;
                 }
                 _ => ()
@@ -193,7 +191,7 @@ fn main() {
             moved = true;
         }
 
-        display.get_window().unwrap().set_cursor_position(window_size.0 as i32/2, window_size.1 as i32/2);
+        let _ = display.get_window().unwrap().set_cursor_position(window_size.0 as i32/2, window_size.1 as i32/2);
 
         if moved {
             draw(pos, pitch, yaw, &mut grid);
@@ -293,29 +291,5 @@ fn get_tile_at_pos(pos: [f64; 3]) -> u8 {
         5 => if y <= 5 { 5 } else { 0 },
         id => id,
     }
-}
-
-fn rotate_y(dir: &[f64; 3], angle: f64) -> [f64; 3] {
-    [
-        dir[0] * angle.cos() + dir[2] * angle.sin(),
-        dir[1],
-        - dir[0] * angle.sin() + dir[2] * angle.cos(),
-    ]
-}
-
-fn rotate_vec_axis(vec: [f64; 3], axis: [f64; 3], angle: f64) -> [f64; 3] {
-    let vec_parallel = vm::vec3_scale(axis, vm::vec3_dot(vec, axis) / vm::vec3_dot(axis, axis));
-    let vec_perpendicular = vm::vec3_sub(vec, vec_parallel);
-    let perpendicular_magnitude = vm::vec3_len(vec_perpendicular);
-
-    /* Create a second axis so that we have a plane to rotate on */
-    let w = vm::vec3_cross(axis, vec_perpendicular);
-    let wx = angle.cos() / perpendicular_magnitude;
-    let wy = angle.sin() / vm::vec3_len(w);
-
-    let perpendicular_component = vm::vec3_scale(vm::vec3_add(vm::vec3_scale(vec_perpendicular, wx), vm::vec3_scale(w, wy)), perpendicular_magnitude);
-
-    let rotated_vector = vm::vec3_add(perpendicular_component, vec_parallel);
-    rotated_vector
 }
 
