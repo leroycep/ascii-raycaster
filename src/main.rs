@@ -1,4 +1,6 @@
 
+#[macro_use]
+extern crate glium;
 extern crate termion;
 extern crate vecmath as vm;
 
@@ -39,8 +41,63 @@ const DISPLAY_SIZE: [isize; 2] = [120, 60];
 const MOVE_SPEED: f64 = 0.75;
 const TURN_SPEED: f64 = 0.03;
 
+#[derive(Copy, Clone)]
+struct Vertex {
+    position: [f32; 2],
+}
+
+implement_vertex!(Vertex, position);
+
 fn main() {
-    let mut stdin = termion::async_stdin().keys();
+    use glium::DisplayBuild;
+    let gl_request = glium::glutin::GlRequest::Specific(glium::glutin::Api::OpenGl, (2,1));
+    let display = glium::glutin::WindowBuilder::new().with_gl(gl_request).build_glium().unwrap();
+
+    let vertex1 = Vertex { position: [-1.0, -1.0] };
+    let vertex2 = Vertex { position: [1.0, -1.0] };
+    let vertex3 = Vertex { position: [-1.0, 1.0] };
+    let vertex4 = Vertex { position: [1.0, 1.0] };
+    let shape = vec![vertex1, vertex2, vertex3, vertex4, vertex2, vertex3];
+
+    let vertex_buffer = glium::VertexBuffer::new(&display, &shape).unwrap();
+    let indices = glium::index::NoIndices(glium::index::PrimitiveType::TrianglesList);
+
+    let vertex_shader_src = r#"
+        #version 120
+
+        attribute vec2 position;
+
+        void main() {
+            gl_Position = vec4(position, 0.0, 1.0);
+        }
+    "#;
+
+    let fragment_shader_src = r#"
+        #version 120
+
+        void main() {
+            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+        }
+    "#;
+
+    let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
+
+    loop {
+        for ev in display.poll_events() {
+            use glium::Surface;
+            let mut target = display.draw();
+            target.clear_color(0.0, 0.0, 1.0, 1.0);
+            target.draw(&vertex_buffer, &indices, &program, &glium::uniforms::EmptyUniforms, &Default::default()).unwrap();
+            target.finish().unwrap();
+
+            match ev {
+                glium::glutin::Event::Closed |
+                glium::glutin::Event::ReceivedCharacter('q') => return,
+                _ => ()
+            }
+        }
+    }
+    /*let mut stdin = termion::async_stdin().keys();
     let mut stderr = stderr();
     let mut screen = AlternateScreen::from(stdout().into_raw_mode().unwrap());
 
@@ -119,7 +176,7 @@ fn main() {
             moved = false;
         }
         thread::sleep(time::Duration::from_millis(20));
-    }
+    }*/
 }
 
 fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, termion::color::Rgb); 120]; 60]) {
