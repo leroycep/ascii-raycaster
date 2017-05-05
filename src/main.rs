@@ -176,6 +176,10 @@ fn main() {
             (false, true, false, false) => Some((180.0f64).to_radians()),
             (false, false, true, false) => Some((-90.0f64).to_radians()),
             (false, false, false, true) => Some((90.0f64).to_radians()),
+            (true, false, true, false) => Some((-45.0f64).to_radians()),
+            (true, false, false, true) => Some((45.0f64).to_radians()),
+            (false, true, true, false) => Some((-135.0f64).to_radians()),
+            (false, true, false, true) => Some((135.0f64).to_radians()),
             _ => None,
         };
 
