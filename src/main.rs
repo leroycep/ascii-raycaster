@@ -165,6 +165,13 @@ fn main() {
                     let delta = [delta[0] / window_size.0 as f64, delta[1] / window_size.1 as f64];
                     pitch -= delta[0] * TURN_SPEED;
                     yaw += delta[1] * TURN_SPEED;
+                    yaw = if yaw < (-90.0f64).to_radians() {
+                        (-90.0f64).to_radians()
+                    } else if yaw > (90.0f64).to_radians() {
+                        (90.0f64).to_radians()
+                    } else {
+                        yaw
+                    };
                     moved = true;
                 }
                 _ => ()
