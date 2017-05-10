@@ -206,7 +206,7 @@ fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, [f32; 3]); 120]
 
             let ray_origin = vm::vec3_add(pos, vm::vec3_add(vm::vec3_add(vm::vec3_scale(right, u), vm::vec3_scale(up, v)), vm::vec3_scale(dir, f)));
             let ray_dir = vm::vec3_sub(ray_origin, pos);
-            let (tile, side) = raymarch(pos, ray_dir);
+            let (tile, side) = raymarch(pos, ray_dir, Max::Steps(50));
             let side = side as f32;
             grid[y][x] = match tile {
                 1 => ('r', [1.0/side,0.02/side,0.02/side]),
@@ -220,7 +220,17 @@ fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, [f32; 3]); 120]
     }
 }
 
-fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> (u8, u8) {
+#[derive(Copy, Clone)]
+enum Max {
+    Steps(usize),
+    Distance(f64),
+}
+
+fn raymarch(pos: [f64; 3], dir: [f64; 3], max: Max) -> (u8, u8) {
+    let (max_steps, max_distance) = match max {
+        Max::Steps(num) => (num, ::std::f64::INFINITY),
+        Max::Distance(dist) => (::std::usize::MAX, dist),
+    };
     let mut map_pos = [pos[0].round(), pos[1].round(), pos[2].round()];
     let dir2 = [dir[0]*dir[0], dir[1]*dir[1], dir[2]*dir[2]];
     let delta_dist = [(1.0             + dir2[1]/dir2[0] + dir2[2]/dir2[0]).sqrt(),
@@ -239,7 +249,7 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> (u8, u8) {
             side_dist[i] = (map_pos[i] + 1.0 - pos[i]) * delta_dist[i];
         }
     }
-    for _ in 0..50 {
+    for _ in 0..max_steps {
         if side_dist[0] < side_dist[1] && side_dist[0] < side_dist[2] {
             side_dist[0] += delta_dist[0];
             map_pos[0] += step[0];
@@ -256,6 +266,9 @@ fn raymarch(pos: [f64; 3], dir: [f64; 3]) -> (u8, u8) {
         let tile = get_tile_at_pos([map_pos[0], map_pos[1], map_pos[2]]);
         if tile > 0 {
             return (tile, side);
+        }
+        if vm::vec3_len(side_dist) >= max_distance {
+            return (0, 1);
         }
     }
     return (0, 1);
