@@ -167,13 +167,29 @@ fn main() {
         };
 
         if let Some(angle) = move_angle {
-            let next_x = pos[0] + MOVE_SPEED * (pitch + angle).cos();
-            if get_tile_at_pos([next_x, pos[1], pos[2]]) == 0 {
-                pos[0] = next_x;
-            }
-            let next_z = pos[2] + MOVE_SPEED * (pitch + angle).sin();
-            if get_tile_at_pos([pos[0], pos[1], next_z]) == 0 {
-                pos[2] = next_z;
+            let move_amount = [MOVE_SPEED * (pitch + angle).cos(), 0.0,MOVE_SPEED * (pitch + angle).sin()];
+            'AXIS_LOOP:
+            for i in 0..3 {
+                let move_amount = {
+                    let mut single_move_amount = [0.0; 3];
+                    single_move_amount[i] = move_amount[i];
+                    single_move_amount
+                };
+                let end_pos = vm::vec3_add(pos, move_amount);
+                let dir = if end_pos[i] > pos[i] {
+                    1.0
+                } else {
+                    -1.0
+                };
+                let mut tile_pos = pos;
+                tile_pos[i] = tile_pos[i].floor();
+                while (dir > 0.0 && tile_pos[i] > end_pos[i]) || (dir < 0.0 && tile_pos[i] < end_pos[i]) {
+                    if get_tile_at_pos(tile_pos) != 0 {
+                        continue 'AXIS_LOOP;
+                    }
+                    tile_pos[i] += dir;
+                }
+                pos[i] = end_pos[i];
             }
             moved = true;
         }
