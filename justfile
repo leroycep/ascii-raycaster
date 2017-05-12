@@ -1,6 +1,6 @@
 
 run:
-  cargo run
+  env RUST_BACKTRACE=1 cargo run
 
 
 rrun:
