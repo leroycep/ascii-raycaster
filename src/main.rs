@@ -213,33 +213,47 @@ fn main() {
         if let Some(angle) = move_angle {
             let move_amount =
                 [MOVE_SPEED * (pitch + angle).cos(), 0.0, MOVE_SPEED * (pitch + angle).sin()];
-            'AXIS_LOOP: for i in 0..3 {
-                let step = move_amount[i];
-                let side_pos = if step < 0.0 {
-                    pos[i] - 0.5
-                } else if step > 0.0 {
-                    pos[i] + 0.5
-                } else {
-                    continue 'AXIS_LOOP;
-                };
-                let mut pos_plus_step = pos;
-                pos_plus_step[i] += step;
 
-                let mut ray_pos = pos;
-                ray_pos[i] = side_pos;
-                let mut ray_dir = [0.0; 3];
-                ray_dir[i] = step / step.abs();
-                let (_, _, dist) = raymarch(ray_pos, ray_dir, Max::Distance(step.abs()));
-                let mut ray_new_pos = pos;
-                ray_new_pos[i] += if step < 0.0 { -dist } else { dist };
+            if move_amount[0] != 0.0 {
+                let dir = move_amount[0].signum();
+                let forward_side = pos[0] + 0.5 * dir;
 
-                let new_pos = [(dist, ray_new_pos), (step.abs(), pos_plus_step)]
-                    .iter()
-                    .min_by(|a, b| {println!("a {:?} b {:?}", a,b); a.0.partial_cmp(&b.0).expect("Everything should be comparable")})
-                    .unwrap()
-                    .1;
-                pos = new_pos;
+                let mut check_pos = pos;
+                check_pos[0] = forward_side;
+
+                let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], 0, move_amount[0]);
+
+                if is_block {
+                    println!("min_dist: {}", min_dist);
+                }
+
+                pos[0] += min_dist * dir;
             }
+
+            if move_amount[1] != 0.0 {
+                let dir = move_amount[1].signum();
+                let forward_side = pos[1] + 0.5 * dir;
+
+                let mut check_pos = pos;
+                check_pos[1] = forward_side;
+
+                let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], 1, move_amount[1]);
+
+                pos[1] += min_dist * dir;
+            }
+
+            if move_amount[2] != 0.0 {
+                let dir = move_amount[2].signum();
+                let forward_side = pos[2] + 0.5 * dir;
+
+                let mut check_pos = pos;
+                check_pos[2] = forward_side;
+
+                let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], 2, move_amount[2]);
+
+                pos[2] += min_dist * dir;
+            }
+
             moved = true;
         }
 
@@ -249,6 +263,10 @@ fn main() {
 
         if moved {
             draw(pos, pitch, yaw, &mut grid);
+            let debug = format!("{:?}", pos);
+            for (i, c) in (0..).zip(debug.chars()) {
+                grid[0][i] = (c, [1.0,1.0,1.0]);
+            }
             moved = false;
         }
     }
@@ -295,6 +313,44 @@ fn draw(pos: [f64; 3], pitch: f64, yaw: f64, grid: &mut [[(char, [f32; 3]); 120]
 enum Max {
     Steps(usize),
     Distance(f64),
+}
+
+fn check_collision_axis(pos: [f64; 3], size: [f64; 3], axis: usize, max_dist: f64) -> (bool, f64) {
+    if max_dist == 0.0 { return (false, 0.0) }
+
+    let dir = max_dist.signum();
+    let axis_two = (axis + 1) % 3;
+    let axis_three = (axis + 2) % 3;
+
+    let mut start = [
+        pos[0].floor() as i64,
+        pos[1].floor() as i64,
+        pos[2].floor() as i64
+        ];
+    start[axis_two] = (pos[axis_two] - size[axis_two]).floor() as i64;
+    start[axis_three] = (pos[axis_three] - size[axis_three]).floor() as i64;
+
+    let mut end = start;
+    end[axis] = (pos[axis] + max_dist).floor() as i64;
+    end[axis_two] = (pos[axis_two] + size[axis_two]).floor() as i64;
+    end[axis_three] = (pos[axis_three] + size[axis_three]).floor() as i64;
+    let end = end;
+
+    for i in start[axis]..end[axis] {
+        for j in start[axis_two]..end[axis_two] {
+            for k in start[axis_three]..end[axis_three] {
+                let mut grid_pos = [0.0; 3];
+                grid_pos[axis] = i as f64;
+                grid_pos[axis_two] = j as f64;
+                grid_pos[axis_three] = k as f64;
+                if get_tile_at_pos(grid_pos) != 0 {
+                    println!("ijk: {:?}, axis: {:?}, grid_pos: {:?}, start: {:?}, end: {:?}", [i,j,k], axis, grid_pos, start, end);
+                    return (true, (grid_pos[axis] - start[axis] as f64).abs());
+                }
+            }
+        }
+    }
+    (false, max_dist.abs())
 }
 
 fn raymarch(pos: [f64; 3], dir: [f64; 3], max: Max) -> (u8, u8, f64) {
