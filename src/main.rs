@@ -214,44 +214,24 @@ fn main() {
             let move_amount =
                 [MOVE_SPEED * (pitch + angle).cos(), 0.0, MOVE_SPEED * (pitch + angle).sin()];
 
-            if move_amount[0] != 0.0 {
-                let dir = move_amount[0].signum();
-                let forward_side = pos[0] + 0.5 * dir;
+            for axis in 0..move_amount.len() {
+                if move_amount[axis] != 0.0 {
+                    let dir = move_amount[axis].signum();
+                    let forward_side = pos[axis] + 0.5 * dir;
+    
+                    let mut check_pos = pos;
+                    check_pos[axis] = forward_side;
+    
+                    let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], axis, move_amount[axis]);
 
-                let mut check_pos = pos;
-                check_pos[0] = forward_side;
+                    let old_pos = pos;
+    
+                    pos[axis] += min_dist;
 
-                let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], 0, move_amount[0]);
-
-                if is_block {
-                    println!("min_dist: {}", min_dist);
+                    if is_block {
+                        println!("axis: {}, is_block: {}, min_dist: {} move_amount: {}, {:?}, {:?}", axis, is_block, min_dist, move_amount[axis], old_pos, pos);
+                    }
                 }
-
-                pos[0] += min_dist * dir;
-            }
-
-            if move_amount[1] != 0.0 {
-                let dir = move_amount[1].signum();
-                let forward_side = pos[1] + 0.5 * dir;
-
-                let mut check_pos = pos;
-                check_pos[1] = forward_side;
-
-                let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], 1, move_amount[1]);
-
-                pos[1] += min_dist * dir;
-            }
-
-            if move_amount[2] != 0.0 {
-                let dir = move_amount[2].signum();
-                let forward_side = pos[2] + 0.5 * dir;
-
-                let mut check_pos = pos;
-                check_pos[2] = forward_side;
-
-                let (is_block, min_dist) = check_collision_axis(pos, [0.5,0.5,0.5], 2, move_amount[2]);
-
-                pos[2] += min_dist * dir;
             }
 
             moved = true;
@@ -318,7 +298,6 @@ enum Max {
 fn check_collision_axis(pos: [f64; 3], size: [f64; 3], axis: usize, max_dist: f64) -> (bool, f64) {
     if max_dist == 0.0 { return (false, 0.0) }
 
-    let dir = max_dist.signum();
     let axis_two = (axis + 1) % 3;
     let axis_three = (axis + 2) % 3;
 
@@ -336,20 +315,35 @@ fn check_collision_axis(pos: [f64; 3], size: [f64; 3], axis: usize, max_dist: f6
     end[axis_three] = (pos[axis_three] + size[axis_three]).floor() as i64;
     let end = end;
 
-    for i in start[axis]..end[axis] {
-        for j in start[axis_two]..end[axis_two] {
-            for k in start[axis_three]..end[axis_three] {
-                let mut grid_pos = [0.0; 3];
-                grid_pos[axis] = i as f64;
-                grid_pos[axis_two] = j as f64;
-                grid_pos[axis_three] = k as f64;
+    let mut dir = [0; 3];
+    dir[axis] = max_dist.signum() as i64;
+    dir[axis_two] = (end[axis_two] - start[axis_two]).signum() as i64;
+    dir[axis_three] = (end[axis_three] - start[axis_three]).signum() as i64;
+
+    let mut tile_pos = start;
+    let mut grid_pos = [0.0; 3];
+    while (dir[axis] > 0 && tile_pos[axis] <= end[axis]) || (dir[axis] < 0 && tile_pos[axis] >= end[axis]) {
+        grid_pos[axis] = tile_pos[axis] as f64;
+        while (dir[axis_two] > 0 && tile_pos[axis_two] <= end[axis_two]) || (dir[axis_two] < 0 && tile_pos[axis_two] >= end[axis_two]) {
+            grid_pos[axis_two] = tile_pos[axis_two] as f64;
+            while (dir[axis_three] > 0 && tile_pos[axis_three] <= end[axis_three]) || (dir[axis_three] < 0 && tile_pos[axis_three] >= end[axis_three]) {
+                grid_pos[axis_three] = tile_pos[axis_three] as f64;
                 if get_tile_at_pos(grid_pos) != 0 {
-                    println!("ijk: {:?}, axis: {:?}, grid_pos: {:?}, start: {:?}, end: {:?}", [i,j,k], axis, grid_pos, start, end);
-                    return (true, (grid_pos[axis] - start[axis] as f64).abs());
+                    if dir[axis] > 0 {
+                        return (true, grid_pos[axis] - pos[axis]);
+                    } else {
+                        return (true, grid_pos[axis] - pos[axis] + 1.0);
+                    }
                 }
+                tile_pos[axis_three] += dir[axis_three];
             }
+            tile_pos[axis_three] = start[axis_three];
+            tile_pos[axis_two] += dir[axis_two];
         }
+        tile_pos[axis_two] = start[axis_two];
+        tile_pos[axis] += dir[axis];
     }
+
     (false, max_dist.abs())
 }
 
